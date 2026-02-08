@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta http-equiv="X-UA-Compatible" content="IE=edge" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>OdotNYC VR Event Realm/title>
+  <title>Small Metaverse Vision</title>
 
   <!-- A-Frame -->
   <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
@@ -25,8 +25,8 @@
 
   <style>
     /* =========================
-       DARK MODE HTML LOADING OVERLAY
-       (kept dark; sits above scene while boot terminal runs)
+       DARK MODE BOOT OVERLAY (SPLASH)
+       now includes centered logo + fixed 2s
        ========================= */
     #darkLoadingOverlay {
       position: fixed;
@@ -39,12 +39,31 @@
       display: flex;
       align-items: center;
       justify-content: center;
+      padding: 24px;
     }
     #darkLoadingOverlay.hidden {
       opacity: 0;
       pointer-events: none;
     }
-    .darkLoadingHint {
+
+    .bootWrap {
+      width: min(520px, 92vw);
+      display: grid;
+      gap: 14px;
+      justify-items: center;
+      text-align: center;
+    }
+
+    .bootLogo {
+      width: 260px;
+      max-width: 70vw;
+      filter:
+        drop-shadow(0 0 16px rgba(0, 246, 255, 0.22))
+        drop-shadow(0 0 26px rgba(255, 43, 220, 0.10));
+      animation: bootGlitch 1.2s infinite steps(2, end);
+    }
+
+    .bootHint {
       font-family: "Orbitron", system-ui, sans-serif;
       letter-spacing: 3px;
       font-size: 12px;
@@ -52,6 +71,27 @@
       text-shadow: 0 0 12px rgba(0, 246, 255, 0.25);
       opacity: 0.75;
       user-select: none;
+    }
+
+    .bootSub {
+      font-family: "Orbitron", system-ui, sans-serif;
+      letter-spacing: 2px;
+      font-size: 11px;
+      color: rgba(255, 255, 255, 0.65);
+      opacity: 0.7;
+      user-select: none;
+    }
+
+    /* simple “glitch” wobble without hard jumps */
+    @keyframes bootGlitch {
+      0%   { transform: translate(0,0); filter: drop-shadow(0 0 16px rgba(0, 246, 255, 0.22)); opacity: 1; }
+      12%  { transform: translate(1px,0); opacity: 0.92; }
+      24%  { transform: translate(-1px,1px); opacity: 0.98; }
+      36%  { transform: translate(0,-1px); opacity: 0.90; }
+      50%  { transform: translate(2px,0); opacity: 0.98; }
+      64%  { transform: translate(-2px,0); opacity: 0.92; }
+      78%  { transform: translate(0,1px); opacity: 0.98; }
+      100% { transform: translate(0,0); opacity: 1; }
     }
 
     /* =========================
@@ -183,7 +223,7 @@
       height: 140px;
       z-index: 50;
       pointer-events: none;
-      display: none; /* shown on touch devices via JS */
+      display: none;
     }
     .joyBase {
       position: absolute;
@@ -244,12 +284,11 @@
     // GLITCH + BOOT TERMINAL (A-FRAME)
     // =========================
 
-    // jitter a target entity for "glitch" moments
     AFRAME.registerComponent('glitch-jitter', {
       schema: {
-        intensity: { type: 'number', default: 0.02 }, // meters
-        rate: { type: 'number', default: 0.08 },      // chance per tick
-        hold: { type: 'number', default: 60 }         // ms per glitch
+        intensity: { type: 'number', default: 0.02 },
+        rate: { type: 'number', default: 0.08 },
+        hold: { type: 'number', default: 60 }
       },
       init() {
         this.basePos = null;
@@ -260,25 +299,22 @@
           const p = this.el.getAttribute('position');
           this.basePos = { x: p.x, y: p.y, z: p.z };
         }
-
         if (time < this.until) return;
 
         if (Math.random() < this.data.rate) {
           const i = this.data.intensity;
           const dx = (Math.random() * 2 - 1) * i;
           const dy = (Math.random() * 2 - 1) * i;
+
           this.el.setAttribute('position', {
             x: this.basePos.x + dx,
             y: this.basePos.y + dy,
             z: this.basePos.z
           });
 
-          // quick flicker
           this.el.setAttribute('visible', Math.random() > 0.12);
-
           this.until = time + this.data.hold;
 
-          // restore shortly after
           setTimeout(() => {
             this.el.setAttribute('position', this.basePos);
             this.el.setAttribute('visible', true);
@@ -287,28 +323,23 @@
       }
     });
 
-    // Boot terminal manager: fixed 2s minimum, waits for scene ready
+    // Boot terminal: fixed splash (2s) regardless of scene load,
+    // but will not hide earlier than 2s.
     AFRAME.registerComponent('boot-terminal', {
       schema: { minDurationMs: { type: 'int', default: 2000 } },
       init() {
-        this.sceneReady = false;
         this.hidden = false;
-
         this.startedAt = performance.now();
-        this.scene = this.el.sceneEl;
 
         this.barFill = document.querySelector('#bootBarFill');
         this.barFill2 = document.querySelector('#bootBarFill2');
         this.pctText = document.querySelector('#bootPctText');
         this.statusText = document.querySelector('#bootStatusText');
 
-        // start at 0
         if (this.barFill) this.barFill.setAttribute('scale', '0.0001 1 1');
         if (this.barFill2) this.barFill2.setAttribute('scale', '0.0001 1 1');
         if (this.pctText) this.pctText.setAttribute('value', '0%');
         if (this.statusText) this.statusText.setAttribute('value', 'INITIALIZING…');
-
-        this.scene.addEventListener('loaded', () => { this.sceneReady = true; });
 
         this.controlsOverlay = document.getElementById('controlsOverlay');
         this.darkOverlay = document.getElementById('darkLoadingOverlay');
@@ -331,20 +362,19 @@
           if (pct < 30) this.statusText.setAttribute('value', 'INITIALIZING…');
           else if (pct < 65) this.statusText.setAttribute('value', 'LOADING MODULES…');
           else if (pct < 95) this.statusText.setAttribute('value', 'SYNCING WORLD STATE…');
-          else this.statusText.setAttribute('value', this.sceneReady ? 'READY' : 'WAITING FOR SCENE…');
+          else this.statusText.setAttribute('value', 'READY');
         }
 
-        if (this.sceneReady && elapsed >= this.data.minDurationMs) {
+        if (elapsed >= this.data.minDurationMs) {
+          // Hide boot terminal and splash overlay after 2 seconds
           this.el.setAttribute('visible', 'false');
           this.hidden = true;
 
-          // fade the HTML dark overlay out
           if (this.darkOverlay) {
             this.darkOverlay.classList.add('hidden');
             setTimeout(() => this.darkOverlay.remove(), 650);
           }
 
-          // show controls overlay
           if (this.controlsOverlay) this.controlsOverlay.style.display = 'flex';
         }
       }
@@ -353,9 +383,13 @@
 </head>
 
 <body>
-  <!-- Dark mode loading overlay (keeps the page dark while the diegetic terminal runs) -->
+  <!-- Dark mode boot overlay (centered ODOTNYC logo + fixed 2s) -->
   <div id="darkLoadingOverlay">
-    <div class="darkLoadingHint">BOOTING EVENT REALM… Patience! - OdotNYC</div>
+    <div class="bootWrap">
+      <img class="bootLogo" src="odotnyc.png" alt="ODOT NYC Logo" />
+      <div class="bootHint">BOOTING REALM…</div>
+      <div class="bootSub">WORK IN PROGRESS</div>
+    </div>
   </div>
 
   <!-- Instructions Overlay -->
@@ -407,9 +441,8 @@
 
   <a-scene fog="type: linear; color: #AAA" loading-screen="enabled: false">
     <!-- Assets -->
-    <a-assets id="assets" timeout="15000">
+    <a-assets timeout="15000">
       <img id="odotnycLogo" src="odotnyc.png" crossorigin="anonymous" />
-
       <video id="mainVid" src="main.mp4" preload="auto" loop="true" crossorigin="anonymous"></video>
       <video id="leftVid" src="left2.mp4" preload="auto" loop="true" crossorigin="anonymous"></video>
       <video id="rightVid" src="right.mp4" preload="auto" loop="true" crossorigin="anonymous"></video>
@@ -425,105 +458,47 @@
         wasd-controls="acceleration: 45"
       ></a-entity>
 
-      <!-- DIEGETIC BOOT TERMINAL (dark-mode) -->
+      <!-- Diegetic boot terminal (in-world) -->
       <a-entity id="bootTerminal" position="0 0 -1.15" boot-terminal="minDurationMs: 2000">
-        <!-- terminal panel -->
-        <a-plane
-          width="1.65" height="0.95"
-          color="#06070b"
-          material="transparent: true; opacity: 0.94; shader: flat"
-          position="0 0 0"
-        ></a-plane>
+        <a-plane width="1.65" height="0.95" color="#06070b"
+          material="transparent: true; opacity: 0.94; shader: flat" position="0 0 0"></a-plane>
 
-        <!-- neon border glow -->
-        <a-plane
-          width="1.69" height="0.99"
-          color="#00f6ff"
-          material="transparent: true; opacity: 0.16; shader: flat"
-          position="0 0 -0.001"
-        ></a-plane>
+        <a-plane width="1.69" height="0.99" color="#00f6ff"
+          material="transparent: true; opacity: 0.16; shader: flat" position="0 0 -0.001"></a-plane>
 
-        <!-- subtle scanlines -->
-        <a-plane
-          width="1.62" height="0.92"
-          color="#00f6ff"
-          material="transparent: true; opacity: 0.05; shader: flat"
-          position="0 0 0.001"
-        ></a-plane>
-
-        <!-- header -->
         <a-entity
           text="value: ODOT//TERM v0.1  |  WORK IN PROGRESS; color: #00f6ff; align: center; width: 2.6; baseline: top"
-          position="0 0.43 0.01"
-        ></a-entity>
+          position="0 0.43 0.01"></a-entity>
 
-        <!-- status -->
-        <a-entity
-          id="bootStatusText"
+        <a-entity id="bootStatusText"
           text="value: INITIALIZING…; color: #b6ff00; align: center; width: 2.4"
-          position="0 0.25 0.01"
-        ></a-entity>
+          position="0 0.25 0.01"></a-entity>
 
-        <!-- Glitch Logo Stack -->
+        <!-- Centered logo inside terminal too -->
         <a-image
           src="#odotnycLogo"
           width="0.62" height="0.22"
           position="0 0.06 0.02"
           material="shader: flat; transparent: true; opacity: 0.95"
-          glitch-jitter="intensity: 0.012; rate: 0.12; hold: 70"
-        ></a-image>
+          glitch-jitter="intensity: 0.012; rate: 0.12; hold: 70"></a-image>
 
-        <a-image
-          src="#odotnycLogo"
-          width="0.62" height="0.22"
-          position="0.008 0.064 0.021"
-          material="shader: flat; transparent: true; opacity: 0.35; color: #00f6ff"
-          glitch-jitter="intensity: 0.016; rate: 0.18; hold: 55"
-        ></a-image>
-
-        <a-image
-          src="#odotnycLogo"
-          width="0.62" height="0.22"
-          position="-0.010 0.056 0.021"
-          material="shader: flat; transparent: true; opacity: 0.30; color: #ff2bdc"
-          glitch-jitter="intensity: 0.018; rate: 0.16; hold: 60"
-        ></a-image>
-
-        <!-- bar frame -->
-        <a-plane
-          width="1.35" height="0.07"
-          color="#111"
+        <a-plane width="1.35" height="0.07" color="#111"
           material="shader: flat; transparent: true; opacity: 0.95"
-          position="0 -0.23 0.01"
-        ></a-plane>
+          position="0 -0.23 0.01"></a-plane>
 
-        <!-- bar fills -->
         <a-entity position="-0.675 -0.23 0.02">
-          <a-plane
-            id="bootBarFill"
-            width="1.35" height="0.05"
-            color="#00f6ff"
+          <a-plane id="bootBarFill" width="1.35" height="0.05" color="#00f6ff"
             material="shader: flat; transparent: true; opacity: 0.65"
-            position="0.675 0 0"
-            scale="0.0001 1 1"
-          ></a-plane>
+            position="0.675 0 0" scale="0.0001 1 1"></a-plane>
 
-          <a-plane
-            id="bootBarFill2"
-            width="1.35" height="0.05"
-            color="#ff2bdc"
+          <a-plane id="bootBarFill2" width="1.35" height="0.05" color="#ff2bdc"
             material="shader: flat; transparent: true; opacity: 0.22"
-            position="0.675 0 0.0005"
-            scale="0.0001 1 1"
-          ></a-plane>
+            position="0.675 0 0.0005" scale="0.0001 1 1"></a-plane>
         </a-entity>
 
-        <!-- percent -->
-        <a-entity
-          id="bootPctText"
+        <a-entity id="bootPctText"
           text="value: 0%; color: #dffcff; align: center; width: 2"
-          position="0 -0.33 0.01"
-        ></a-entity>
+          position="0 -0.33 0.01"></a-entity>
       </a-entity>
     </a-entity>
 
@@ -542,13 +517,11 @@
     <a-video src="#leftVid" width="6" height="8" position="10 5 -25"></a-video>
     <a-video src="#rightVid" width="6" height="8" position="-10 5 -25"></a-video>
 
-    <!-- Logo overlays on screens -->
+    <!-- Logo overlays -->
     <a-plane src="#odotnycLogo" width="3.2" height="1.2" position="0 2.2 -24.99"
       material="shader: flat; transparent: true; opacity: 0.95"></a-plane>
-
     <a-plane src="#odotnycLogo" width="2.4" height="0.9" position="10 2.2 -24.99"
       material="shader: flat; transparent: true; opacity: 0.95"></a-plane>
-
     <a-plane src="#odotnycLogo" width="2.4" height="0.9" position="-10 2.2 -24.99"
       material="shader: flat; transparent: true; opacity: 0.95"></a-plane>
 
@@ -557,19 +530,13 @@
   </a-scene>
 
   <script>
-    // Controls overlay close behavior
+    // Close instructions
     const controlsOverlay = document.getElementById("controlsOverlay");
     const enterBtn = document.getElementById("enterRealmBtn");
-
-    function hideControlsOverlay() { controlsOverlay.style.display = "none"; }
-
+    const hideControlsOverlay = () => (controlsOverlay.style.display = "none");
     enterBtn.addEventListener("click", hideControlsOverlay);
-    controlsOverlay.addEventListener("click", (e) => {
-      if (e.target === controlsOverlay) hideControlsOverlay();
-    });
-    window.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") hideControlsOverlay();
-    });
+    controlsOverlay.addEventListener("click", (e) => { if (e.target === controlsOverlay) hideControlsOverlay(); });
+    window.addEventListener("keydown", (e) => { if (e.key === "Enter") hideControlsOverlay(); });
 
     // Show joystick HUD only on touch devices
     const joystickHud = document.getElementById("joystickHud");
@@ -578,3 +545,4 @@
   </script>
 </body>
 </html>
+
