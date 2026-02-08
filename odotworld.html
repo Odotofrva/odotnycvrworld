@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Small Metaverse Vision</title>
+
+  <!-- A-Frame -->
+  <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
+
+  <!-- Environment -->
+  <script src="https://unpkg.com/aframe-environment-component@1.2.0/dist/aframe-environment-component.min.js"></script>
+
+  <!-- Optional -->
+  <script src="video.js"></script>
+
+  <!-- Virtual Joystick -->
+  <script src="https://cdn.jsdelivr.net/npm/aframe-virtual-joystick/dist/aframe-virtual-joystick.js"></script>
+
+  <!-- UI font (HTML overlay only) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600&display=swap" rel="stylesheet">
+
+  <style>
+    /* =========================
+       DARK MODE HTML LOADING OVERLAY
+       (kept dark; sits above scene while boot terminal runs)
+       ========================= */
+    #darkLoadingOverlay {
+      position: fixed;
+      inset: 0;
+      background: radial-gradient(circle at center, #0a0b10 0%, #000 70%);
+      z-index: 9999;
+      opacity: 1;
+      pointer-events: auto;
+      transition: opacity 0.6s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    #darkLoadingOverlay.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+    .darkLoadingHint {
+      font-family: "Orbitron", system-ui, sans-serif;
+      letter-spacing: 3px;
+      font-size: 12px;
+      color: rgba(0, 246, 255, 0.85);
+      text-shadow: 0 0 12px rgba(0, 246, 255, 0.25);
+      opacity: 0.75;
+      user-select: none;
+    }
+
+    /* =========================
+       CONTROLS OVERLAY (instructions)
+       ========================= */
+    #controlsOverlay {
+      position: fixed;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0,0,0,0.82);
+      z-index: 9998;
+      padding: 18px;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    }
+
+    .controlsCard {
+      width: min(520px, 92vw);
+      background: #000;
+      border: 2px solid rgba(0, 246, 255, 0.85);
+      box-shadow:
+        0 0 18px rgba(0,246,255,0.25),
+        0 0 34px rgba(255,43,220,0.20);
+      border-radius: 14px;
+      padding: 18px 16px;
+      color: #dffcff;
+    }
+
+    .controlsTitle {
+      font-weight: 800;
+      letter-spacing: 1px;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .badge {
+      font-size: 12px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 43, 220, 0.9);
+      color: #ffb7f3;
+      background: rgba(255, 43, 220, 0.10);
+      white-space: nowrap;
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .panel {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 12px;
+      padding: 12px;
+    }
+
+    .panel h4 {
+      font-size: 14px;
+      margin: 0 0 6px 0;
+      color: #b6ff00;
+      letter-spacing: 0.3px;
+    }
+
+    .keys {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 8px;
+    }
+
+    .key {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-weight: 700;
+      font-size: 12px;
+      padding: 8px 10px;
+      border-radius: 10px;
+      border: 1px solid rgba(0,246,255,0.55);
+      background: rgba(0,246,255,0.08);
+      color: #dffcff;
+      box-shadow: 0 0 12px rgba(0,246,255,0.08);
+    }
+
+    .hint {
+      font-size: 13px;
+      line-height: 1.4;
+      opacity: 0.92;
+    }
+
+    .actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 14px;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+    }
+
+    .enterBtn {
+      border: none;
+      border-radius: 12px;
+      padding: 10px 14px;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+      background: linear-gradient(135deg, #ff2bdc, #00f6ff);
+      color: #000;
+      cursor: pointer;
+      box-shadow:
+        0 0 16px rgba(255,43,220,0.35),
+        0 0 22px rgba(0,246,255,0.25);
+    }
+
+    .smallNote { font-size: 12px; opacity: 0.75; }
+
+    /* =========================
+       VISIBLE JOYSTICK HUD (always visible on touch)
+       ========================= */
+    #joystickHud {
+      position: fixed;
+      left: 18px;
+      bottom: 18px;
+      width: 140px;
+      height: 140px;
+      z-index: 50;
+      pointer-events: none;
+      display: none; /* shown on touch devices via JS */
+    }
+    .joyBase {
+      position: absolute;
+      inset: 0;
+      border-radius: 999px;
+      background: radial-gradient(circle at center, rgba(0, 246, 255, 0.08), rgba(0,0,0,0));
+      border: 2px solid rgba(0, 246, 255, 0.55);
+      box-shadow:
+        0 0 18px rgba(0, 246, 255, 0.22),
+        inset 0 0 18px rgba(255, 43, 220, 0.10);
+      backdrop-filter: blur(2px);
+    }
+    .joyThumb {
+      position: absolute;
+      width: 56px;
+      height: 56px;
+      border-radius: 999px;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      background: radial-gradient(circle at 30% 30%, rgba(255,43,220,0.95), rgba(0,246,255,0.75));
+      border: 2px solid rgba(255,255,255,0.20);
+      box-shadow:
+        0 0 18px rgba(255, 43, 220, 0.25),
+        0 0 26px rgba(0, 246, 255, 0.18);
+      opacity: 0.75;
+    }
+    .joyLabel {
+      position: absolute;
+      left: 50%;
+      bottom: -18px;
+      transform: translateX(-50%);
+      font-family: "Orbitron", system-ui, sans-serif;
+      color: rgba(255,255,255,0.65);
+      font-size: 12px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+
+    /* style the REAL nipplejs joystick on touch */
+    .nipple { opacity: 0.95 !important; z-index: 60 !important; }
+    .nipple .back {
+      background: radial-gradient(circle at center, rgba(0, 246, 255, 0.12), rgba(0,0,0,0)) !important;
+      border: 2px solid rgba(0, 246, 255, 0.65) !important;
+      box-shadow: 0 0 22px rgba(0, 246, 255, 0.25) !important;
+    }
+    .nipple .front {
+      background: radial-gradient(circle at 30% 30%, rgba(255,43,220,0.95), rgba(0,246,255,0.75)) !important;
+      border: 2px solid rgba(255,255,255,0.25) !important;
+      box-shadow:
+        0 0 18px rgba(255, 43, 220, 0.25),
+        0 0 26px rgba(0, 246, 255, 0.18) !important;
+    }
+  </style>
+
+  <script>
+    // =========================
+    // GLITCH + BOOT TERMINAL (A-FRAME)
+    // =========================
+
+    // jitter a target entity for "glitch" moments
+    AFRAME.registerComponent('glitch-jitter', {
+      schema: {
+        intensity: { type: 'number', default: 0.02 }, // meters
+        rate: { type: 'number', default: 0.08 },      // chance per tick
+        hold: { type: 'number', default: 60 }         // ms per glitch
+      },
+      init() {
+        this.basePos = null;
+        this.until = 0;
+      },
+      tick(time) {
+        if (!this.basePos) {
+          const p = this.el.getAttribute('position');
+          this.basePos = { x: p.x, y: p.y, z: p.z };
+        }
+
+        if (time < this.until) return;
+
+        if (Math.random() < this.data.rate) {
+          const i = this.data.intensity;
+          const dx = (Math.random() * 2 - 1) * i;
+          const dy = (Math.random() * 2 - 1) * i;
+          this.el.setAttribute('position', {
+            x: this.basePos.x + dx,
+            y: this.basePos.y + dy,
+            z: this.basePos.z
+          });
+
+          // quick flicker
+          this.el.setAttribute('visible', Math.random() > 0.12);
+
+          this.until = time + this.data.hold;
+
+          // restore shortly after
+          setTimeout(() => {
+            this.el.setAttribute('position', this.basePos);
+            this.el.setAttribute('visible', true);
+          }, this.data.hold);
+        }
+      }
+    });
+
+    // Boot terminal manager: fixed 2s minimum, waits for scene ready
+    AFRAME.registerComponent('boot-terminal', {
+      schema: { minDurationMs: { type: 'int', default: 2000 } },
+      init() {
+        this.sceneReady = false;
+        this.hidden = false;
+
+        this.startedAt = performance.now();
+        this.scene = this.el.sceneEl;
+
+        this.barFill = document.querySelector('#bootBarFill');
+        this.barFill2 = document.querySelector('#bootBarFill2');
+        this.pctText = document.querySelector('#bootPctText');
+        this.statusText = document.querySelector('#bootStatusText');
+
+        // start at 0
+        if (this.barFill) this.barFill.setAttribute('scale', '0.0001 1 1');
+        if (this.barFill2) this.barFill2.setAttribute('scale', '0.0001 1 1');
+        if (this.pctText) this.pctText.setAttribute('value', '0%');
+        if (this.statusText) this.statusText.setAttribute('value', 'INITIALIZING…');
+
+        this.scene.addEventListener('loaded', () => { this.sceneReady = true; });
+
+        this.controlsOverlay = document.getElementById('controlsOverlay');
+        this.darkOverlay = document.getElementById('darkLoadingOverlay');
+      },
+      tick() {
+        if (this.hidden) return;
+
+        const now = performance.now();
+        const elapsed = now - this.startedAt;
+
+        const t = Math.min(1, elapsed / this.data.minDurationMs);
+        const pct = Math.floor(t * 100);
+
+        const sx = Math.max(0.0001, t);
+        if (this.barFill) this.barFill.setAttribute('scale', `${sx} 1 1`);
+        if (this.barFill2) this.barFill2.setAttribute('scale', `${sx} 1 1`);
+        if (this.pctText) this.pctText.setAttribute('value', `${pct}%`);
+
+        if (this.statusText) {
+          if (pct < 30) this.statusText.setAttribute('value', 'INITIALIZING…');
+          else if (pct < 65) this.statusText.setAttribute('value', 'LOADING MODULES…');
+          else if (pct < 95) this.statusText.setAttribute('value', 'SYNCING WORLD STATE…');
+          else this.statusText.setAttribute('value', this.sceneReady ? 'READY' : 'WAITING FOR SCENE…');
+        }
+
+        if (this.sceneReady && elapsed >= this.data.minDurationMs) {
+          this.el.setAttribute('visible', 'false');
+          this.hidden = true;
+
+          // fade the HTML dark overlay out
+          if (this.darkOverlay) {
+            this.darkOverlay.classList.add('hidden');
+            setTimeout(() => this.darkOverlay.remove(), 650);
+          }
+
+          // show controls overlay
+          if (this.controlsOverlay) this.controlsOverlay.style.display = 'flex';
+        }
+      }
+    });
+  </script>
+</head>
+
+<body>
+  <!-- Dark mode loading overlay (keeps the page dark while the diegetic terminal runs) -->
+  <div id="darkLoadingOverlay">
+    <div class="darkLoadingHint">BOOTING REALM…</div>
+  </div>
+
+  <!-- Instructions Overlay -->
+  <div id="controlsOverlay">
+    <div class="controlsCard">
+      <div class="controlsTitle">
+        <div>HOW TO MOVE</div>
+        <div class="badge">REALM NAV</div>
+      </div>
+
+      <div class="row">
+        <div class="panel">
+          <h4>Keyboard (Desktop)</h4>
+          <div class="hint">Use these keys to move:</div>
+          <div class="keys">
+            <span class="key">W</span>
+            <span class="key">A</span>
+            <span class="key">S</span>
+            <span class="key">D</span>
+            <span class="key">SHIFT</span>
+            <span class="key">SPACE</span>
+          </div>
+          <div class="smallNote" style="margin-top:8px;">Mouse drag to look around.</div>
+        </div>
+
+        <div class="panel">
+          <h4>Mobile / Touch</h4>
+          <div class="hint">
+            Use the on-screen joystick (bottom-left) to move.<br/>
+            Drag the right side to look around.
+          </div>
+          <div class="smallNote" style="margin-top:8px;">Tip: Headphones on.</div>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button class="enterBtn" id="enterRealmBtn" type="button">ENTER REALM</button>
+        <div class="smallNote">Tap anywhere or press ENTER to close</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Visible joystick HUD -->
+  <div id="joystickHud" aria-hidden="true">
+    <div class="joyBase"></div>
+    <div class="joyThumb"></div>
+    <div class="joyLabel">MOVE</div>
+  </div>
+
+  <a-scene fog="type: linear; color: #AAA" loading-screen="enabled: false">
+    <!-- Assets -->
+    <a-assets id="assets" timeout="15000">
+      <img id="odotnycLogo" src="odotnyc.png" crossorigin="anonymous" />
+
+      <video id="mainVid" src="main.mp4" preload="auto" loop="true" crossorigin="anonymous"></video>
+      <video id="leftVid" src="left2.mp4" preload="auto" loop="true" crossorigin="anonymous"></video>
+      <video id="rightVid" src="right.mp4" preload="auto" loop="true" crossorigin="anonymous"></video>
+    </a-assets>
+
+    <!-- Camera Rig -->
+    <a-entity id="rig" position="0 0 0">
+      <a-entity
+        id="camera"
+        camera
+        position="0 1.6 0"
+        look-controls="touchEnabled: true; mouseEnabled: true"
+        wasd-controls="acceleration: 45"
+      ></a-entity>
+
+      <!-- DIEGETIC BOOT TERMINAL (dark-mode) -->
+      <a-entity id="bootTerminal" position="0 0 -1.15" boot-terminal="minDurationMs: 2000">
+        <!-- terminal panel -->
+        <a-plane
+          width="1.65" height="0.95"
+          color="#06070b"
+          material="transparent: true; opacity: 0.94; shader: flat"
+          position="0 0 0"
+        ></a-plane>
+
+        <!-- neon border glow -->
+        <a-plane
+          width="1.69" height="0.99"
+          color="#00f6ff"
+          material="transparent: true; opacity: 0.16; shader: flat"
+          position="0 0 -0.001"
+        ></a-plane>
+
+        <!-- subtle scanlines -->
+        <a-plane
+          width="1.62" height="0.92"
+          color="#00f6ff"
+          material="transparent: true; opacity: 0.05; shader: flat"
+          position="0 0 0.001"
+        ></a-plane>
+
+        <!-- header -->
+        <a-entity
+          text="value: ODOT//TERM v0.1  |  WORK IN PROGRESS; color: #00f6ff; align: center; width: 2.6; baseline: top"
+          position="0 0.43 0.01"
+        ></a-entity>
+
+        <!-- status -->
+        <a-entity
+          id="bootStatusText"
+          text="value: INITIALIZING…; color: #b6ff00; align: center; width: 2.4"
+          position="0 0.25 0.01"
+        ></a-entity>
+
+        <!-- Glitch Logo Stack -->
+        <a-image
+          src="#odotnycLogo"
+          width="0.62" height="0.22"
+          position="0 0.06 0.02"
+          material="shader: flat; transparent: true; opacity: 0.95"
+          glitch-jitter="intensity: 0.012; rate: 0.12; hold: 70"
+        ></a-image>
+
+        <a-image
+          src="#odotnycLogo"
+          width="0.62" height="0.22"
+          position="0.008 0.064 0.021"
+          material="shader: flat; transparent: true; opacity: 0.35; color: #00f6ff"
+          glitch-jitter="intensity: 0.016; rate: 0.18; hold: 55"
+        ></a-image>
+
+        <a-image
+          src="#odotnycLogo"
+          width="0.62" height="0.22"
+          position="-0.010 0.056 0.021"
+          material="shader: flat; transparent: true; opacity: 0.30; color: #ff2bdc"
+          glitch-jitter="intensity: 0.018; rate: 0.16; hold: 60"
+        ></a-image>
+
+        <!-- bar frame -->
+        <a-plane
+          width="1.35" height="0.07"
+          color="#111"
+          material="shader: flat; transparent: true; opacity: 0.95"
+          position="0 -0.23 0.01"
+        ></a-plane>
+
+        <!-- bar fills -->
+        <a-entity position="-0.675 -0.23 0.02">
+          <a-plane
+            id="bootBarFill"
+            width="1.35" height="0.05"
+            color="#00f6ff"
+            material="shader: flat; transparent: true; opacity: 0.65"
+            position="0.675 0 0"
+            scale="0.0001 1 1"
+          ></a-plane>
+
+          <a-plane
+            id="bootBarFill2"
+            width="1.35" height="0.05"
+            color="#ff2bdc"
+            material="shader: flat; transparent: true; opacity: 0.22"
+            position="0.675 0 0.0005"
+            scale="0.0001 1 1"
+          ></a-plane>
+        </a-entity>
+
+        <!-- percent -->
+        <a-entity
+          id="bootPctText"
+          text="value: 0%; color: #dffcff; align: center; width: 2"
+          position="0 -0.33 0.01"
+        ></a-entity>
+      </a-entity>
+    </a-entity>
+
+    <!-- Touch joystick movement -->
+    <a-entity
+      joystick="
+        joystickAreaStyle: position:fixed; display:block; width:50%; height:100%; left:0px; bottom:0px; background-color:rgba(0,0,0,0.05); z-index:55;
+        textOverlayStyle: position:fixed; bottom:10px; left:10px; font-size:12px Arial; opacity:0.0; color:white; z-index:56;
+        speedReductionFactor: 45;
+      "
+    ></a-entity>
+
+    <!-- Screens -->
+    <a-box color="#181818" width="20" height="10" depth="0.3" position="0 5 -26"></a-box>
+    <a-video src="#mainVid" width="12" height="8" position="0 5 -25"></a-video>
+    <a-video src="#leftVid" width="6" height="8" position="10 5 -25"></a-video>
+    <a-video src="#rightVid" width="6" height="8" position="-10 5 -25"></a-video>
+
+    <!-- Logo overlays on screens -->
+    <a-plane src="#odotnycLogo" width="3.2" height="1.2" position="0 2.2 -24.99"
+      material="shader: flat; transparent: true; opacity: 0.95"></a-plane>
+
+    <a-plane src="#odotnycLogo" width="2.4" height="0.9" position="10 2.2 -24.99"
+      material="shader: flat; transparent: true; opacity: 0.95"></a-plane>
+
+    <a-plane src="#odotnycLogo" width="2.4" height="0.9" position="-10 2.2 -24.99"
+      material="shader: flat; transparent: true; opacity: 0.95"></a-plane>
+
+    <!-- Environment -->
+    <a-entity environment="preset: default; groundColor: #445; groundTexture: walkernoise; grid: cross"></a-entity>
+  </a-scene>
+
+  <script>
+    // Controls overlay close behavior
+    const controlsOverlay = document.getElementById("controlsOverlay");
+    const enterBtn = document.getElementById("enterRealmBtn");
+
+    function hideControlsOverlay() { controlsOverlay.style.display = "none"; }
+
+    enterBtn.addEventListener("click", hideControlsOverlay);
+    controlsOverlay.addEventListener("click", (e) => {
+      if (e.target === controlsOverlay) hideControlsOverlay();
+    });
+    window.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") hideControlsOverlay();
+    });
+
+    // Show joystick HUD only on touch devices
+    const joystickHud = document.getElementById("joystickHud");
+    const isTouch = ("ontouchstart" in window) || (navigator.maxTouchPoints > 0);
+    if (isTouch) joystickHud.style.display = "block";
+  </script>
+</body>
+</html>
